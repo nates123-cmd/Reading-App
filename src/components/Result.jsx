@@ -1,0 +1,115 @@
+import { formatPercent } from '../lib/sync'
+
+/**
+ * What happened, and how to actually get to the spot.
+ *
+ * The manual card is not a fallback for errors -- it is the primary path
+ * whenever the X4 has no Wi-Fi, which is often. The device can only be
+ * navigated by its table of contents and a go-to-percent slider, so those are
+ * exactly what we show, plus a line of text to confirm you landed right.
+ *
+ * The percentage shown for the device is deliberately `percent_device`, not
+ * `text_percent`. The X4's slider runs on its own byte-weighted ruler, and on a
+ * markup-heavy book the two differ by a fifth of the book.
+ */
+export function Result({ row, book, onReset }) {
+  const r = row.result || {}
+  const ok = row.status === 'done'
+  const pushed = Array.isArray(r.pushed) ? r.pushed : []
+
+  return (
+    <>
+      {!ok && (
+        <div className="card error">
+          <div className="card-title">
+            {row.status === 'not_found' && 'Could not find those words'}
+            {row.status === 'timeout' && 'No answer from the Beelink'}
+            {row.status === 'failed' && 'Something went wrong'}
+            {row.status === 'ambiguous' && 'Too many matches'}
+          </div>
+          <p className="muted">
+            {row.detail ||
+              'Try a longer or more distinctive phrase, and check for typos.'}
+          </p>
+        </div>
+      )}
+
+      {ok && (
+        <>
+          <div className="card">
+            <div className="card-title">Found it</div>
+            <div className="place">
+              {r.chapter && <div className="chapter">{r.chapter}</div>}
+              <div className="pcts">
+                <span className="pct">{formatPercent(r.text_percent)}</span>
+                <span className="muted"> through the book</span>
+              </div>
+            </div>
+            {r.quote && <p className="quote">“{r.quote}…”</p>}
+            {r.occurrences > 1 && (
+              <p className="hint">
+                Those words appear {r.occurrences} times. Picked the one nearest
+                where you last were.
+              </p>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="card-title">
+              On the X4
+              {pushed.includes('x4') && <span className="badge">sent</span>}
+            </div>
+
+            <ol className="steps">
+              <li>
+                <strong>With Wi-Fi:</strong> open the book, then Reader Menu →
+                Sync&nbsp;Progress. It will jump here.
+              </li>
+              <li>
+                <strong>Without Wi-Fi:</strong> Reader Menu → Go&nbsp;to&nbsp;Percent,
+                set it to <strong>{Math.round((r.percent_device ?? 0) * 100)}%</strong>
+                {r.chapter && <> (or pick <strong>{r.chapter}</strong> from the contents)</>},
+                then page until you reach the line above.
+              </li>
+            </ol>
+
+            <p className="hint">
+              The X4 only syncs when you ask it to — it keeps Wi-Fi off the rest
+              of the time.
+            </p>
+
+            {r.warning && <div className="warn">{r.warning}</div>}
+          </div>
+
+          {r.abs && (
+            <div className="card">
+              <div className="card-title">Audiobook</div>
+              <p className="muted">{r.abs}</p>
+            </div>
+          )}
+
+          {r.alternatives?.length > 0 && (
+            <div className="card">
+              <div className="card-title">Other matches</div>
+              <ul className="alts">
+                {r.alternatives.map((a, i) => (
+                  <li key={i}>
+                    <span className="pct-sm">{formatPercent(a.text_percent)}</span>
+                    <span className="muted"> …{a.context}…</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="hint">
+                Wrong one? Type a few more words to narrow it down.
+              </p>
+            </div>
+          )}
+        </>
+      )}
+
+      <button className="btn ghost" onClick={onReset}>
+        Look up another spot
+      </button>
+    </>
+  )
+}
