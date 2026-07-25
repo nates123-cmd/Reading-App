@@ -14,16 +14,25 @@ const ABS_URL = import.meta.env.VITE_ABS_URL || ''
  * The device must be on the tailnet and signed into ABS web once.
  */
 function OpenInAbs({ itemId }) {
-  if (!ABS_URL) return null
-  const url = `${ABS_URL.replace(/\/$/, '')}/item/${itemId}`
+  const url = ABS_URL ? `${ABS_URL.replace(/\/$/, '')}/item/${itemId}` : null
   return (
     <>
-      <a className="btn" href={url} target="_blank" rel="noopener noreferrer">
-        ▶ Open in Audiobookshelf
-      </a>
       <p className="hint">
-        Opens the book at your synced spot — tap Play to start from there.
+        Open your <strong>Audiobookshelf app</strong> — this book is on your
+        Continue&nbsp;Listening shelf at the synced spot. Tap it and play.
       </p>
+      {url && (
+        <>
+          <a className="btn ghost" href={url} target="_blank" rel="noopener noreferrer">
+            ▶ Open the web player instead
+          </a>
+          <p className="hint">
+            The app can't be opened straight to a book (Audiobookshelf doesn't
+            support it), so this link uses the web player. The app is smoother —
+            it's already cued there.
+          </p>
+        </>
+      )}
     </>
   )
 }
