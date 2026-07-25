@@ -168,6 +168,12 @@ body {
   background: var(--signal);
   color: #fff;
   cursor: pointer;
+  /* Works whether it's a <button> or an <a>. */
+  display: block;
+  width: 100%;
+  text-align: center;
+  text-decoration: none;
+  box-sizing: border-box;
 }
 
 .btn[disabled] { opacity: 0.45; cursor: default; }

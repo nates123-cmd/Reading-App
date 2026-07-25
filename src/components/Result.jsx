@@ -1,6 +1,33 @@
 import { useState } from 'react'
 import { formatPercent } from '../lib/sync'
 
+const ABS_URL = import.meta.env.VITE_ABS_URL || ''
+
+/**
+ * Open Audiobookshelf's web player on this book. It resumes from the position
+ * we just set, so it's one tap to Play at the synced spot.
+ *
+ * Audiobookshelf has no auto-play URL and its native app can't be deep-linked
+ * to a book (its scheme is OAuth-only), so this opens the web player. It's an
+ * http:// link on the tailnet; opening it in a NEW TAB from this HTTPS page is
+ * allowed (mixed-content only blocks subresources, not a top-level navigation).
+ * The device must be on the tailnet and signed into ABS web once.
+ */
+function OpenInAbs({ itemId }) {
+  if (!ABS_URL) return null
+  const url = `${ABS_URL.replace(/\/$/, '')}/item/${itemId}`
+  return (
+    <>
+      <a className="btn" href={url} target="_blank" rel="noopener noreferrer">
+        ▶ Open in Audiobookshelf
+      </a>
+      <p className="hint">
+        Opens the book at your synced spot — tap Play to start from there.
+      </p>
+    </>
+  )
+}
+
 /** The reverse direction: where am I now, as a phrase to search on the Kindle. */
 function ResumeResult({ r }) {
   const [copied, setCopied] = useState(false)
@@ -124,6 +151,7 @@ export function Result({ row, book, onReset }) {
             <div className="card">
               <div className="card-title">Audiobook</div>
               <p className="muted">{r.abs}</p>
+              {r.abs_item_id && <OpenInAbs itemId={r.abs_item_id} />}
             </div>
           )}
 
