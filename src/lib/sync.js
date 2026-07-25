@@ -56,7 +56,10 @@ export async function submitAnchor({ bookKey, bookTitle, anchorType, anchorValue
       anchor_type: anchorType,
       anchor_value: String(anchorValue),
       near,
-      targets: targets && targets.length ? targets : ['x4'],
+      // Push to both by default. The poller no-ops 'abs' for a book with no
+      // audiobook, so this is safe everywhere and means the audiobook seeks
+      // itself for the books that have one.
+      targets: targets && targets.length ? targets : ['x4', 'abs'],
     })
     .select()
     .single()
