@@ -68,6 +68,28 @@ export async function submitAnchor({ bookKey, bookTitle, anchorType, anchorValue
 }
 
 /**
+ * "Continue on Kindle": ask the box where we currently are across the X4 and
+ * the audiobook, and get back a phrase to search on the Kindle. This is the
+ * reverse of submitAnchor -- we pull the furthest position in rather than
+ * pushing one out, so it takes no anchor and no push targets.
+ */
+export async function requestResume({ bookKey, bookTitle, source = 'auto' }) {
+  const { data, error } = await supabase
+    .from('reading_sync_requests')
+    .insert({
+      book_key: bookKey,
+      book_title: bookTitle,
+      anchor_type: 'resume',
+      anchor_value: source,
+      targets: [],
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+/**
  * Poll the row until the box has processed it. Polling rather than Realtime:
  * Realtime is not enabled on these tables, and a handful of 1s polls is a
  * cheaper thing to get right than a subscription that silently never fires.

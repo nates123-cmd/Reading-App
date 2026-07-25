@@ -1,4 +1,40 @@
+import { useState } from 'react'
 import { formatPercent } from '../lib/sync'
+
+/** The reverse direction: where am I now, as a phrase to search on the Kindle. */
+function ResumeResult({ r }) {
+  const [copied, setCopied] = useState(false)
+  const phrase = r.kindle_phrase || ''
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(phrase)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      /* clipboard blocked -- the phrase is on screen to type by hand */
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="card-title">Continue on Kindle</div>
+      <p className="hint">
+        You're in {r.chapter ? <strong>{r.chapter}</strong> : 'the book'}
+        {' '}(~{formatPercent(r.text_percent)}), from {r.from || 'your devices'}.
+      </p>
+
+      <p className="label">Search this on your Kindle</p>
+      <button type="button" className="phrase" onClick={copy} title="Tap to copy">
+        {phrase || '—'}
+      </button>
+      <p className="hint">
+        {copied ? 'Copied. ' : 'Tap the phrase to copy. '}
+        Open the book on the Kindle, tap search, paste, and tap the result.
+      </p>
+    </div>
+  )
+}
 
 /**
  * What happened, and how to actually get to the spot.
@@ -16,9 +52,12 @@ export function Result({ row, book, onReset }) {
   const r = row.result || {}
   const ok = row.status === 'done'
   const pushed = Array.isArray(r.pushed) ? r.pushed : []
+  const isResume = 'kindle_phrase' in r || row.anchor_type === 'resume'
 
   return (
     <>
+      {ok && isResume && <ResumeResult r={r} />}
+
       {!ok && (
         <div className="card error">
           <div className="card-title">
@@ -34,7 +73,7 @@ export function Result({ row, book, onReset }) {
         </div>
       )}
 
-      {ok && (
+      {ok && !isResume && (
         <>
           <div className="card">
             <div className="card-title">Found it</div>

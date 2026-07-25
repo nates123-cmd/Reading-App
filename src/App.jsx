@@ -6,6 +6,7 @@ import {
   lastPositionFor,
   listBooks,
   rememberPosition,
+  requestResume,
   submitAnchor,
 } from './lib/sync'
 import { Result } from './components/Result'
@@ -28,6 +29,9 @@ const MODES = {
 export default function App() {
   const [books, setBooks] = useState([])
   const [bookKey, setBookKey] = useState('')
+  // Two directions: 'save' pushes where I stopped OUT to the devices;
+  // 'resume' pulls my current spot IN as a phrase to search on the Kindle.
+  const [flow, setFlow] = useState('save')
   const [mode, setMode] = useState('phrase')
   const [value, setValue] = useState('')
   const [busy, setBusy] = useState(false)
@@ -53,17 +57,21 @@ export default function App() {
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!bookKey || !value.trim() || busy) return
+    if (!bookKey || busy) return
+    if (flow === 'save' && !value.trim()) return
     setBusy(true)
     setError(null)
     setResult(null)
     try {
-      const row = await submitAnchor({
-        bookKey,
-        bookTitle: book?.title || bookKey,
-        anchorType: mode,
-        anchorValue: value.trim(),
-      })
+      const row =
+        flow === 'resume'
+          ? await requestResume({ bookKey, bookTitle: book?.title || bookKey })
+          : await submitAnchor({
+              bookKey,
+              bookTitle: book?.title || bookKey,
+              anchorType: mode,
+              anchorValue: value.trim(),
+            })
       const done = await awaitResult(row.id)
       setResult(done)
       if (done.status === 'done' && typeof done.result?.text_percent === 'number') {
@@ -105,6 +113,23 @@ export default function App() {
 
         {!result && (
           <form className="card" onSubmit={submit}>
+            <div className="segmented flows" role="tablist">
+              <button
+                type="button" role="tab" aria-selected={flow === 'save'}
+                className={flow === 'save' ? 'seg on' : 'seg'}
+                onClick={() => setFlow('save')}
+              >
+                I stopped here
+              </button>
+              <button
+                type="button" role="tab" aria-selected={flow === 'resume'}
+                className={flow === 'resume' ? 'seg on' : 'seg'}
+                onClick={() => setFlow('resume')}
+              >
+                Continue on Kindle
+              </button>
+            </div>
+
             <label className="label" htmlFor="book">Book</label>
             <select
               id="book"
@@ -118,46 +143,61 @@ export default function App() {
               ))}
             </select>
 
-            <div className="segmented" role="tablist">
-              {Object.entries(MODES).map(([key, m]) => (
-                <button
-                  key={key}
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === key}
-                  className={mode === key ? 'seg on' : 'seg'}
-                  onClick={() => { setMode(key); setValue('') }}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
+            {flow === 'save' ? (
+              <>
+                <div className="segmented" role="tablist">
+                  {Object.entries(MODES).map(([key, m]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={mode === key}
+                      className={mode === key ? 'seg on' : 'seg'}
+                      onClick={() => { setMode(key); setValue('') }}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
 
-            <label className="label" htmlFor="anchor">
-              {mode === 'phrase' ? 'Where you stopped' : 'Percent shown on the Kindle'}
-            </label>
-            <input
-              id="anchor"
-              className="input"
-              value={value}
-              inputMode={MODES[mode].inputMode}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder={MODES[mode].placeholder}
-              autoComplete="off"
-              autoCapitalize="none"
-              autoCorrect="off"
-            />
-            <p className="hint">{MODES[mode].hint}</p>
+                <label className="label" htmlFor="anchor">
+                  {mode === 'phrase' ? 'Where you stopped' : 'Percent shown on the Kindle'}
+                </label>
+                <input
+                  id="anchor"
+                  className="input"
+                  value={value}
+                  inputMode={MODES[mode].inputMode}
+                  onChange={(e) => setValue(e.target.value)}
+                  placeholder={MODES[mode].placeholder}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                />
+                <p className="hint">{MODES[mode].hint}</p>
 
-            {near !== null && (
+                {near !== null && (
+                  <p className="hint">
+                    Last synced at {formatPercent(near)} — used to pick the right match
+                    if your words appear more than once.
+                  </p>
+                )}
+              </>
+            ) : (
               <p className="hint">
-                Last synced at {formatPercent(near)} — used to pick the right match
-                if your words appear more than once.
+                Reads where you are on the X4 and the audiobook, and gives you a
+                phrase to search on the Kindle. Read or listen a bit first (and
+                sync the X4) so there's a position to find.
               </p>
             )}
 
-            <button className="btn" type="submit" disabled={busy || !value.trim() || !bookKey}>
-              {busy ? 'finding it…' : 'Find my place'}
+            <button
+              className="btn" type="submit"
+              disabled={busy || !bookKey || (flow === 'save' && !value.trim())}
+            >
+              {busy
+                ? (flow === 'resume' ? 'checking…' : 'finding it…')
+                : (flow === 'resume' ? 'Where am I?' : 'Find my place')}
             </button>
 
             {error && <div className="error-text">{error}</div>}
