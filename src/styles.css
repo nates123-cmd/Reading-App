@@ -216,6 +216,42 @@ body {
   -webkit-user-select: text;
 }
 
+/* Near-miss suggestions after a failed phrase lookup. Each one is a full-width
+   tap target because this gets used one-handed, mid-book, in bad light. */
+.suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.suggestion {
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.suggestion:active { border-color: var(--signal); }
+
+.suggestion-phrase {
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.suggestion-meta {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
 .flows { margin-bottom: 4px; }
 
 .phrase {
