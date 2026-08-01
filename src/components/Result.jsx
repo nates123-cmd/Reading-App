@@ -84,11 +84,12 @@ function ResumeResult({ r }) {
  * `text_percent`. The X4's slider runs on its own byte-weighted ruler, and on a
  * markup-heavy book the two differ by a fifth of the book.
  */
-export function Result({ row, book, onReset }) {
+export function Result({ row, book, onReset, onSuggestion }) {
   const r = row.result || {}
   const ok = row.status === 'done'
   const pushed = Array.isArray(r.pushed) ? r.pushed : []
   const isResume = 'kindle_phrase' in r || row.anchor_type === 'resume'
+  const suggestions = Array.isArray(r.suggestions) ? r.suggestions : []
 
   return (
     <>
@@ -97,15 +98,42 @@ export function Result({ row, book, onReset }) {
       {!ok && (
         <div className="card error">
           <div className="card-title">
-            {row.status === 'not_found' && 'Could not find those words'}
+            {row.status === 'not_found' &&
+              (suggestions.length ? 'Did you mean…' : 'Could not find those words')}
             {row.status === 'timeout' && 'No answer from the Beelink'}
             {row.status === 'failed' && 'Something went wrong'}
             {row.status === 'ambiguous' && 'Too many matches'}
           </div>
-          <p className="muted">
-            {row.detail ||
-              'Try a longer or more distinctive phrase, and check for typos.'}
-          </p>
+
+          {suggestions.length > 0 ? (
+            <>
+              <p className="muted">
+                Those exact words aren't in the book — usually a typo. The
+                closest {suggestions.length === 1 ? 'passage is' : 'passages are'}:
+              </p>
+              <div className="suggestions">
+                {suggestions.map((s, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className="suggestion"
+                    onClick={() => onSuggestion?.(s.phrase)}
+                  >
+                    <span className="suggestion-phrase">“{s.phrase}”</span>
+                    <span className="suggestion-meta">
+                      {formatPercent(s.text_percent)} through the book
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <p className="hint">Tap one to sync there.</p>
+            </>
+          ) : (
+            <p className="muted">
+              {row.detail ||
+                'Try a longer or more distinctive phrase, and check for typos.'}
+            </p>
+          )}
         </div>
       )}
 

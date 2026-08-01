@@ -55,23 +55,14 @@ export default function App() {
   const book = books.find((b) => b.book_key === bookKey)
   const near = bookKey ? lastPositionFor(bookKey) : null
 
-  const submit = async (e) => {
-    e.preventDefault()
+  /** One round trip: submit an anchor, wait for the box, show the answer. */
+  const run = async (make) => {
     if (!bookKey || busy) return
-    if (flow === 'save' && !value.trim()) return
     setBusy(true)
     setError(null)
     setResult(null)
     try {
-      const row =
-        flow === 'resume'
-          ? await requestResume({ bookKey, bookTitle: book?.title || bookKey })
-          : await submitAnchor({
-              bookKey,
-              bookTitle: book?.title || bookKey,
-              anchorType: mode,
-              anchorValue: value.trim(),
-            })
+      const row = await make()
       const done = await awaitResult(row.id)
       setResult(done)
       if (done.status === 'done' && typeof done.result?.text_percent === 'number') {
@@ -83,6 +74,39 @@ export default function App() {
     } finally {
       setBusy(false)
     }
+  }
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (flow === 'save' && !value.trim()) return
+    run(() =>
+      flow === 'resume'
+        ? requestResume({ bookKey, bookTitle: book?.title || bookKey })
+        : submitAnchor({
+            bookKey,
+            bookTitle: book?.title || bookKey,
+            anchorType: mode,
+            anchorValue: value.trim(),
+          }),
+    )
+  }
+
+  /**
+   * Retry with a phrase the box suggested after a near-miss. Its wording comes
+   * from the book itself, so this second pass is always an exact hit. The input
+   * is updated too, so what ran is what you see.
+   */
+  const useSuggestion = (phrase) => {
+    setMode('phrase')
+    setValue(phrase)
+    run(() =>
+      submitAnchor({
+        bookKey,
+        bookTitle: book?.title || bookKey,
+        anchorType: 'phrase',
+        anchorValue: phrase,
+      }),
+    )
   }
 
   const reset = () => {
@@ -204,7 +228,14 @@ export default function App() {
           </form>
         )}
 
-        {result && <Result row={result} book={book} onReset={reset} />}
+        {result && (
+          <Result
+            row={result}
+            book={book}
+            onReset={reset}
+            onSuggestion={useSuggestion}
+          />
+        )}
       </main>
     </div>
   )
