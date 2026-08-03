@@ -2,9 +2,10 @@
 
 Find where you stopped reading, and send it to the e-ink devices.
 
-A one-screen PWA. Pick a book, type a few words from where you stopped, and it
+A one-screen PWA. Pick a book, photograph the Kindle page you stopped on, and it
 resolves that to a real position and pushes it to the Xteink X4 (and the
-reMarkable) over kosync.
+reMarkable) over kosync. Typing a few words still works, and is the fallback for
+when the book isn't in front of you.
 
 ## Why this exists
 
@@ -27,12 +28,25 @@ result back into the row. Same outbox shape the rest of the suite uses.
 The box-side half lives in the `beelink-config` repo under `apps/reading-sync/`.
 
 ```
-type a few words
+photograph the page  (or type a few words)
+   -> Claude reads the page, you tap the line you stopped on
    -> reading_sync_requests row
    -> poller resolves it against the EPUB
    -> kosync position   (X4 + reMarkable)
    -> result written back for this app to show
 ```
+
+The camera only replaces the typing. A photo resolves to one line of the book and
+goes into the same row as a typed phrase (`anchor_type: 'phrase'`), so the box,
+the resolver, and the audiobook seek are untouched — nothing server-side knows
+the photo mode exists. Reading the page goes through the suite's shared `claude`
+edge function, which relays image content blocks to the model as-is.
+
+A photographed line is a *better* anchor than a typed one, not just an easier
+one: it's a whole printed line rather than four or five remembered words, so it's
+far more likely to be unique in the book. Against the real library, full lines
+sampled from across a book resolve exactly, and a line with a one-character
+misread still recovers through the near-miss suggestions.
 
 ## Two things that look like bugs and are not
 

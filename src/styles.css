@@ -274,6 +274,42 @@ body {
 .steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; }
 .steps li { font-size: 14px; line-height: 1.5; }
 
+/* The photographed page: the shot, then its lines as a pick-list. Set in the
+   book face rather than the UI face -- you are choosing between lines of the
+   book, and they should read like it. */
+.page-read { display: flex; flex-direction: column; gap: 10px; }
+
+.shot {
+  width: 100%;
+  max-height: 38vh;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.line {
+  width: 100%;
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.4;
+  text-align: left;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 9px 11px;
+  cursor: pointer;
+}
+
+.line.on {
+  color: var(--ink);
+  border-color: var(--signal);
+  background: var(--card);
+}
+
 .alts { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; }
 .alts li { font-size: 13px; line-height: 1.45; }
 
