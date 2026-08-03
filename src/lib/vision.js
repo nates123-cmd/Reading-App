@@ -37,13 +37,16 @@ const MODEL = 'gemini-2.5-flash'
 const SYSTEM = `You transcribe a photograph of a single e-reader page.
 
 Return ONLY a JSON object, no prose and no code fence:
-{"lines": ["...", "..."], "chapter": "..." | null, "empty": false}
+{"lines": [{"text": "...", "new_paragraph": true}], "chapter": "..." | null, "empty": false}
 
 Rules:
 - "lines" is the body text of the page, one entry per printed line, in reading
   order, transcribed EXACTLY as printed. Preserve the line breaks you see on the
   page; do NOT reflow, merge or rewrap lines, and do not fix the author's
   spelling or punctuation.
+- "new_paragraph" is true only for the FIRST line of each paragraph — the ones
+  that are indented, or that follow a blank line or a scene break. Every other
+  line is false. A line that continues the sentence above it is never true.
 - Omit the running header, the footer, the page number, the clock, the battery
   and the progress bar. Body text only.
 - If a word is hyphenated across a line break, repair it: put the whole word on
@@ -183,30 +186,49 @@ export async function readPage(file) {
   const parsed = extractJSON(text)
   if (!parsed) throw new Error('Could not read that photo. Try again in better light.')
 
-  const lines = (Array.isArray(parsed.lines) ? parsed.lines : [])
-    .map((l) => String(l).trim())
-    .filter(Boolean)
+  // Tolerate the older plain-string shape as well as {text, new_paragraph}.
+  const entries = (Array.isArray(parsed.lines) ? parsed.lines : [])
+    .map((l) =>
+      typeof l === 'string'
+        ? { text: l.trim(), new_paragraph: false }
+        : { text: String(l?.text ?? '').trim(), new_paragraph: !!l?.new_paragraph },
+    )
+    .filter((l) => l.text)
 
-  if (parsed.empty || lines.length === 0) {
+  if (parsed.empty || entries.length === 0) {
     throw new Error(
       'No book text in that photo. Fill the frame with the page and keep it flat.',
     )
   }
 
+  const lines = entries.map((e) => e.text)
+
+  // Offer paragraph openings, not every line. A page is a wall of near-identical
+  // rows; the handful of paragraph starts are the landmarks you actually
+  // remember stopping at, and each is distinctive enough to resolve on its own.
+  // If the page is one unbroken paragraph there are no openings to offer, so
+  // fall back to the lines themselves rather than showing an empty list.
+  const starts = entries.filter((e) => e.new_paragraph && isUsableLine(e.text))
+  const usable = (starts.length ? starts : entries.filter((e) => isUsableLine(e.text)))
+    .map((e) => e.text)
+
   return {
     lines,
-    usable: lines.filter(isUsableLine),
+    usable,
+    byParagraph: starts.length > 0,
     chapter: parsed.chapter || null,
     thumbnail: dataUrl,
   }
 }
 
 /**
- * The default guess at where reading stopped: the last usable line on the page.
+ * The default guess at where reading stopped: the last option on the page —
+ * the final paragraph opening, or the last line if the page has no openings.
  *
  * Stopping at the bottom of a page is the common case — you finish the page,
- * then put it down. When it is wrong the user picks a different line, which is
- * why every line stays on screen rather than only this one.
+ * then put it down — so the paragraph you are in is the last one that started.
+ * When that is wrong the user picks another, which is why the rest stay on
+ * screen rather than only this one.
  */
 export function defaultLine({ usable, lines }) {
   const pool = usable?.length ? usable : lines || []

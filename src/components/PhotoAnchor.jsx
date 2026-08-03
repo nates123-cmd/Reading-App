@@ -81,7 +81,11 @@ export function PhotoAnchor({ value, onChange, disabled }) {
 
           {page.chapter && <p className="hint">Looks like {page.chapter}.</p>}
 
-          <p className="label">Which line did you stop on?</p>
+          <p className="label">
+            {page.byParagraph && !showAll
+              ? 'Which paragraph did you stop in?'
+              : 'Which line did you stop on?'}
+          </p>
           <ul className="lines">
             {lines.map((line, i) => (
               <li key={`${i}-${line}`}>
@@ -98,23 +102,20 @@ export function PhotoAnchor({ value, onChange, disabled }) {
           </ul>
 
           <p className="hint">
-            Picked the last line of the page. Tap a different one if you stopped
-            higher up.
+            {page.byParagraph && !showAll
+              ? 'Picked the last paragraph on the page. Tap a different one if you stopped higher up.'
+              : 'Picked the last line of the page. Tap a different one if you stopped higher up.'}
           </p>
 
           {page.lines.length > page.usable.length && (
             <button type="button" className="link" onClick={() => setShowAll((v) => !v)}>
-              {showAll
-                ? 'hide the short lines'
-                : `show ${page.lines.length - page.usable.length} short line${
-                    page.lines.length - page.usable.length === 1 ? '' : 's'
-                  }`}
+              {showAll ? 'just the paragraphs' : 'show every line instead'}
             </button>
           )}
           {showAll && (
             <p className="hint">
-              Short lines match in too many places to find on their own — pick a
-              longer one nearby instead.
+              Every line on the page. Very short ones match in too many places to
+              find on their own — pick a longer one nearby instead.
             </p>
           )}
         </div>
