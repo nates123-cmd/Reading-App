@@ -11,23 +11,28 @@
  * so the resolver, the kosync push and the audiobook seek are all untouched.
  *
  * The model call goes through the suite's shared `claude` edge function, which
- * relays `messages` verbatim to the Anthropic API — image content blocks work
- * with no server-side change. It is JWT-gated, and every screen here is behind
- * AuthGate, so the session token authorises it.
+ * relays image content blocks to the model with no server-side change. It is
+ * JWT-gated, and every screen here is behind AuthGate, so the session token
+ * authorises it.
  */
 
 import { supabase } from './supabase'
 
-// 1568px on the long edge is where this model tier stops getting more out of an
-// image, and a phone photo is several times that. Downscaling before upload is
-// the difference between a ~200KB request and a ~4MB one on a phone connection,
-// and it keeps us well under the API's 5MB base64 ceiling.
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+// 1568px on the long edge is where the vision models stop getting more out of
+// an image, and a phone photo is several times that. Downscaling before upload
+// is the difference between a ~200KB request and a ~4MB one on a phone
+// connection, and it keeps us well under the API's base64 ceiling.
 const MAX_EDGE = 1568
 const JPEG_QUALITY = 0.8
 
-// The suite proxy only relays a fixed set of models; this is the strongest one
-// it accepts, and reading a page of small type is worth it over haiku.
-const MODEL = 'claude-sonnet-4-6'
+// Transcribing a photographed page is a cheap job -- it is reading, not
+// reasoning -- so it runs on the cheapest capable model the proxy relays.
+// Measured against a rendered page: same line-for-line output as Sonnet, ~300
+// input tokens, under two seconds.
+const MODEL = 'gemini-2.5-flash'
 
 const SYSTEM = `You transcribe a photograph of a single e-reader page.
 
@@ -109,6 +114,46 @@ export function isUsableLine(line) {
 }
 
 /**
+ * Call the shared `claude` edge function.
+ *
+ * Deliberately NOT `supabase.functions.invoke`. That helper attaches an
+ * `x-client-info` header to every request, and the function's CORS policy
+ * allows only `authorization, content-type, apikey` — so the browser's
+ * preflight fails and the request never leaves the device. supabase-js reports
+ * that as a bare "Failed to send request to Edge Function", which reads like
+ * the function is down when nothing has been called at all.
+ *
+ * Sending the request ourselves, with only the headers the function allows,
+ * sidesteps it without redeploying a function the whole suite shares.
+ */
+async function callProxy(body) {
+  const { data, error: sessionError } = await supabase.auth.getSession()
+  const token = data?.session?.access_token
+  if (sessionError || !token) throw new Error('Signed out — sign in and try again.')
+
+  let res
+  try {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/claude`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        apikey: SUPABASE_ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+  } catch {
+    throw new Error('Could not reach the reader. Check your connection.')
+  }
+
+  const payload = await res.json().catch(() => null)
+  if (!res.ok || payload?.error) {
+    throw new Error(payload?.error || `The reader returned ${res.status}.`)
+  }
+  return payload
+}
+
+/**
  * Photo -> lines of page text.
  *
  * Returns { lines, usable, chapter, thumbnail }. `lines` is everything read,
@@ -118,18 +163,14 @@ export function isUsableLine(line) {
 export async function readPage(file) {
   const { block, dataUrl } = await toImageBlock(file)
 
-  const { data, error } = await supabase.functions.invoke('claude', {
-    body: {
-      system: SYSTEM,
-      model: MODEL,
-      max_tokens: 2048,
-      messages: [
-        { role: 'user', content: [block, { type: 'text', text: USER_PROMPT }] },
-      ],
-    },
+  const data = await callProxy({
+    system: SYSTEM,
+    model: MODEL,
+    max_tokens: 2048,
+    messages: [
+      { role: 'user', content: [block, { type: 'text', text: USER_PROMPT }] },
+    ],
   })
-  if (error) throw new Error(error.message || 'Could not reach the reader')
-  if (data?.error) throw new Error(data.error)
 
   const text =
     typeof data === 'string'
