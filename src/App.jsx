@@ -10,8 +10,17 @@ import {
   submitAnchor,
 } from './lib/sync'
 import { Result } from './components/Result'
+import { PhotoAnchor } from './components/PhotoAnchor'
 
 const MODES = {
+  photo: {
+    label: 'Photo',
+    // Resolves to a line of text like any other phrase -- the camera only
+    // replaces the typing, not the lookup.
+    hint: '',
+    placeholder: '',
+    inputMode: 'text',
+  },
   phrase: {
     label: 'A few words',
     hint: 'Type 4-5 words from where you stopped. Fewer works, but 4-5 is almost always unique.',
@@ -32,7 +41,10 @@ export default function App() {
   // Two directions: 'save' pushes where I stopped OUT to the devices;
   // 'resume' pulls my current spot IN as a phrase to search on the Kindle.
   const [flow, setFlow] = useState('save')
-  const [mode, setMode] = useState('phrase')
+  // Photo first: it is the whole point of the app to make "where did I stop"
+  // cost nothing, and the camera is cheaper than the keyboard. The typed modes
+  // stay one tap away for when there is no page in front of you.
+  const [mode, setMode] = useState('photo')
   const [value, setValue] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState(null)
@@ -85,7 +97,10 @@ export default function App() {
         : submitAnchor({
             bookKey,
             bookTitle: book?.title || bookKey,
-            anchorType: mode,
+            // A photo resolves to a line of the book, so the box sees exactly
+            // what a typed phrase produces. Nothing server-side knows this
+            // mode exists.
+            anchorType: mode === 'photo' ? 'phrase' : mode,
             anchorValue: value.trim(),
           }),
     )
@@ -184,21 +199,27 @@ export default function App() {
                   ))}
                 </div>
 
-                <label className="label" htmlFor="anchor">
-                  {mode === 'phrase' ? 'Where you stopped' : 'Percent shown on the Kindle'}
-                </label>
-                <input
-                  id="anchor"
-                  className="input"
-                  value={value}
-                  inputMode={MODES[mode].inputMode}
-                  onChange={(e) => setValue(e.target.value)}
-                  placeholder={MODES[mode].placeholder}
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                />
-                <p className="hint">{MODES[mode].hint}</p>
+                {mode === 'photo' ? (
+                  <PhotoAnchor value={value} onChange={setValue} disabled={busy} />
+                ) : (
+                  <>
+                    <label className="label" htmlFor="anchor">
+                      {mode === 'phrase' ? 'Where you stopped' : 'Percent shown on the Kindle'}
+                    </label>
+                    <input
+                      id="anchor"
+                      className="input"
+                      value={value}
+                      inputMode={MODES[mode].inputMode}
+                      onChange={(e) => setValue(e.target.value)}
+                      placeholder={MODES[mode].placeholder}
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                    />
+                    <p className="hint">{MODES[mode].hint}</p>
+                  </>
+                )}
 
                 {near !== null && (
                   <p className="hint">
