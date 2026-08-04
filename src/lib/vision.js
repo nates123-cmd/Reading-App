@@ -222,15 +222,19 @@ export async function readPage(file) {
 }
 
 /**
- * The default guess at where reading stopped: the last option on the page —
- * the final paragraph opening, or the last line if the page has no openings.
+ * The default guess at where reading stopped.
  *
- * Stopping at the bottom of a page is the common case — you finish the page,
- * then put it down — so the paragraph you are in is the last one that started.
- * When that is wrong the user picks another, which is why the rest stay on
- * screen rather than only this one.
+ * When we know where the paragraphs start, it is the **last** opening on the
+ * page: you finish the page, then put it down, so the paragraph you are in is
+ * the one that started most recently.
+ *
+ * When paragraph detection failed there are no landmarks to reason from, and
+ * picking the bottom of a wall of identical lines is as likely to be wrong as
+ * right. Fall back to the **top** of the page — a known, explainable position
+ * the reader can correct, rather than a coin flip dressed up as an answer.
  */
-export function defaultLine({ usable, lines }) {
+export function defaultLine({ usable, lines, byParagraph }) {
   const pool = usable?.length ? usable : lines || []
-  return pool.length ? pool[pool.length - 1] : ''
+  if (!pool.length) return ''
+  return byParagraph ? pool[pool.length - 1] : pool[0]
 }
