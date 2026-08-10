@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { formatPercent } from '../lib/sync'
+import { DEFAULT_DEVICES } from '../lib/devices'
 
 const ABS_URL = import.meta.env.VITE_ABS_URL || ''
 
@@ -34,6 +35,57 @@ function OpenInAbs({ itemId }) {
         </>
       )}
     </>
+  )
+}
+
+/**
+ * Where the spot is on a Kindle.
+ *
+ * Shown to a reader who has no X4 — for them the Kindle is the destination, not
+ * a device the sync skipped. Nothing was pushed anywhere (the Kindle can be
+ * neither read from nor written to), so this is the whole answer: a line to
+ * search for, and a percentage to fall back on.
+ *
+ * The percentage is `text_percent`, not `percent_device`: the X4's byte-weighted
+ * slider is meaningless here, and the Kindle's own percentage tracks readable
+ * text the way this one does.
+ */
+function KindleCard({ r }) {
+  const [copied, setCopied] = useState(false)
+  const quote = r.quote || ''
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(quote)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      /* clipboard blocked -- the line is on screen to type by hand */
+    }
+  }
+
+  return (
+    <div className="card">
+      <div className="card-title">On your Kindle</div>
+
+      {quote ? (
+        <>
+          <p className="label">Search this in the book</p>
+          <button type="button" className="phrase" onClick={copy} title="Tap to copy">
+            {quote}
+          </button>
+          <p className="hint">
+            {copied ? 'Copied. ' : 'Tap the line to copy. '}
+            Open the book, tap search, paste, and tap the result.
+          </p>
+        </>
+      ) : (
+        <p className="hint">
+          Go to about <strong>{Math.round((r.text_percent ?? 0) * 100)}%</strong>
+          {r.chapter && <> (or pick <strong>{r.chapter}</strong> from the contents)</>}.
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -84,10 +136,11 @@ function ResumeResult({ r }) {
  * `text_percent`. The X4's slider runs on its own byte-weighted ruler, and on a
  * markup-heavy book the two differ by a fifth of the book.
  */
-export function Result({ row, book, onReset, onSuggestion }) {
+export function Result({ row, book, devices = DEFAULT_DEVICES, onReset, onSuggestion }) {
   const r = row.result || {}
   const ok = row.status === 'done'
   const pushed = Array.isArray(r.pushed) ? r.pushed : []
+  const hasX4 = devices.includes('x4')
   const isResume = 'kindle_phrase' in r || row.anchor_type === 'resume'
   const suggestions = Array.isArray(r.suggestions) ? r.suggestions : []
 
@@ -155,8 +208,18 @@ export function Result({ row, book, onReset, onSuggestion }) {
                 where you last were.
               </p>
             )}
+            {/* The box drops a target this reader does not own. Say so -- a
+                silent skip reads as a successful push. */}
+            {r.skipped && Object.keys(r.skipped).length > 0 && (
+              <p className="hint">
+                Not sent to: {Object.values(r.skipped).join('; ')}.
+              </p>
+            )}
           </div>
 
+          {!hasX4 && <KindleCard r={r} />}
+
+          {hasX4 && (
           <div className="card">
             <div className="card-title">
               On the X4
@@ -183,6 +246,7 @@ export function Result({ row, book, onReset, onSuggestion }) {
 
             {r.warning && <div className="warn">{r.warning}</div>}
           </div>
+          )}
 
           {r.abs && (
             <div className="card">
