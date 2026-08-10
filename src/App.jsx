@@ -11,6 +11,7 @@ import {
 } from './lib/sync'
 import { Result } from './components/Result'
 import { PhotoAnchor } from './components/PhotoAnchor'
+import { DEFAULT_DEVICES, loadDevices, targetsFor } from './lib/devices'
 
 const MODES = {
   photo: {
@@ -50,6 +51,13 @@ export default function App() {
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
   const [loadErr, setLoadErr] = useState(null)
+  // Two people share this library and not the same hardware. Everything the
+  // app says about a device is gated on the reader actually owning it.
+  const [devices, setDevices] = useState(DEFAULT_DEVICES)
+
+  useEffect(() => {
+    loadDevices().then(setDevices)
+  }, [])
 
   useEffect(() => {
     listBooks()
@@ -102,6 +110,7 @@ export default function App() {
             // mode exists.
             anchorType: mode === 'photo' ? 'phrase' : mode,
             anchorValue: value.trim(),
+            targets: targetsFor(devices),
           }),
     )
   }
@@ -120,6 +129,7 @@ export default function App() {
         bookTitle: book?.title || bookKey,
         anchorType: 'phrase',
         anchorValue: phrase,
+        targets: targetsFor(devices),
       }),
     )
   }
@@ -230,9 +240,19 @@ export default function App() {
               </>
             ) : (
               <p className="hint">
-                Reads where you are on the X4 and the audiobook, and gives you a
-                phrase to search on the Kindle. Read or listen a bit first (and
-                sync the X4) so there's a position to find.
+                {devices.includes('x4') ? (
+                  <>
+                    Reads where you are on the X4 and the audiobook, and gives you a
+                    phrase to search on the Kindle. Read or listen a bit first (and
+                    sync the X4) so there's a position to find.
+                  </>
+                ) : (
+                  <>
+                    Reads where you are in the audiobook and gives you a phrase to
+                    search on the Kindle. Listen a bit first so there's a position
+                    to find.
+                  </>
+                )}
               </p>
             )}
 
@@ -253,6 +273,7 @@ export default function App() {
           <Result
             row={result}
             book={book}
+            devices={devices}
             onReset={reset}
             onSuggestion={useSuggestion}
           />

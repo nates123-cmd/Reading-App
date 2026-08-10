@@ -59,7 +59,11 @@ export async function submitAnchor({ bookKey, bookTitle, anchorType, anchorValue
       // Push to both by default. The poller no-ops 'abs' for a book with no
       // audiobook, so this is safe everywhere and means the audiobook seeks
       // itself for the books that have one.
-      targets: targets && targets.length ? targets : ['x4', 'abs'],
+      //
+      // An explicit [] is honoured: a reader who owns only a Kindle pushes to
+      // nothing, and defaulting that to ['x4', 'abs'] would aim at somebody
+      // else's e-reader. Only an absent list means "decide for me".
+      targets: Array.isArray(targets) ? targets : ['x4', 'abs'],
     })
     .select()
     .single()
