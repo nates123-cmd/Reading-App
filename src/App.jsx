@@ -12,6 +12,7 @@ import {
 import { Result } from './components/Result'
 import { PhotoAnchor } from './components/PhotoAnchor'
 import { DEFAULT_DEVICES, loadDevices, targetsFor } from './lib/devices'
+import { loadDone, saveDone } from './lib/shelf'
 
 const MODES = {
   photo: {
@@ -54,19 +55,55 @@ export default function App() {
   // Two people share this library and not the same hardware. Everything the
   // app says about a device is gated on the reader actually owning it.
   const [devices, setDevices] = useState(DEFAULT_DEVICES)
+  // Books this reader has finished. They stay in the library; they just stop
+  // crowding the picker, so the book you are actually reading is the default.
+  const [done, setDone] = useState([])
+  const [showDone, setShowDone] = useState(false)
 
   useEffect(() => {
     loadDevices().then(setDevices)
   }, [])
 
   useEffect(() => {
-    listBooks()
-      .then((rows) => {
+    Promise.all([listBooks(), loadDone()])
+      .then(([rows, finished]) => {
         setBooks(rows)
-        setBookKey((k) => k || localStorage.getItem('place_last_book') || rows[0]?.book_key || '')
+        setDone(finished)
+        const remembered = localStorage.getItem('place_last_book')
+        const firstOpen = rows.find((b) => !finished.includes(b.book_key))?.book_key
+        // A remembered book that has since been finished should not come back
+        // as the default -- that is the whole reason the list exists.
+        const pick = remembered && !finished.includes(remembered) ? remembered : ''
+        setBookKey((k) => k || pick || firstOpen || rows[0]?.book_key || '')
       })
       .catch((e) => setLoadErr(e.message))
   }, [])
+
+  const isDone = (key) => done.includes(key)
+  // Open books first, finished ones (when shown) after, each group alphabetical.
+  const visible = books
+    .filter((b) => showDone || !isDone(b.book_key))
+    .sort((a, b) => Number(isDone(a.book_key)) - Number(isDone(b.book_key)))
+
+  /** Mark the current book finished, or bring it back. Optimistic; a failed
+   *  write reverts so the picker never lies about what is saved. */
+  const toggleDone = async () => {
+    if (!bookKey) return
+    const before = done
+    const after = isDone(bookKey) ? done.filter((k) => k !== bookKey) : [...done, bookKey]
+    setDone(after)
+    if (!isDone(bookKey) && !showDone) {
+      // Move on to the next open book so the form is never pointed at nothing.
+      const next = books.find((b) => b.book_key !== bookKey && !after.includes(b.book_key))
+      setBookKey(next?.book_key || '')
+    }
+    try {
+      await saveDone(after)
+    } catch (err) {
+      setDone(before)
+      setError(err.message || String(err))
+    }
+  }
 
   useEffect(() => {
     if (bookKey) localStorage.setItem('place_last_book', bookKey)
@@ -186,11 +223,27 @@ export default function App() {
               value={bookKey}
               onChange={(e) => setBookKey(e.target.value)}
             >
-              {books.length === 0 && <option value="">no books yet</option>}
-              {books.map((b) => (
-                <option key={b.book_key} value={b.book_key}>{b.title}</option>
+              {visible.length === 0 && (
+                <option value="">{books.length ? 'every book is marked finished' : 'no books yet'}</option>
+              )}
+              {visible.map((b) => (
+                <option key={b.book_key} value={b.book_key}>
+                  {isDone(b.book_key) ? `${b.title} (finished)` : b.title}
+                </option>
               ))}
             </select>
+            <div className="shelf-row">
+              {bookKey && (
+                <button type="button" className="link" onClick={toggleDone}>
+                  {isDone(bookKey) ? 'Back to reading' : 'Finished this book'}
+                </button>
+              )}
+              {done.length > 0 && (
+                <button type="button" className="link" onClick={() => setShowDone((v) => !v)}>
+                  {showDone ? 'Hide finished' : `Show ${done.length} finished`}
+                </button>
+              )}
+            </div>
 
             {flow === 'save' ? (
               <>

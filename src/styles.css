@@ -195,6 +195,10 @@ body {
 }
 
 .hint { margin: 0; font-size: 13px; color: var(--ink-soft); line-height: 1.45; }
+
+/* The two shelf actions under the book picker: finish / show finished. */
+.shelf-row { display: flex; justify-content: space-between; gap: 12px; margin-top: -6px; }
+.shelf-row .link { padding: 0; }
 .muted { color: var(--ink-soft); }
 .error-text { color: var(--err); font-size: 14px; }
 
